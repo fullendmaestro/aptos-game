@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Move Master: A Rock Paper Scissors Game on Aptos
 
-## Getting Started
+This project implements a fun and interactive Rock Paper Scissors game powered by the Aptos blockchain. It showcases the use of Move smart contracts for game logic and a Next.js frontend for user interaction.
 
-First, run the development server:
+### Features:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Wallet Integration:** Players can connect to the Petra wallet using the `@aptos-labs/wallet-adapter-react` library.
+- **Blockchain Game Logic:** The core game logic (random move generation, move comparison, result determination, and scorekeeping) is implemented in a Move smart contract.
+- **Game History:** All game sessions are recorded on the blockchain, providing a transparent and immutable history of moves and results.
+- **Intuitive Frontend:** The Next.js frontend provides a user-friendly interface with:
+  - A Connect Wallet button to connect to the Petra wallet.
+  - A Start Game button to begin a new game.
+  - Rock, Paper, and Scissors buttons for player moves.
+  - Display of the computer's move and the game result.
+  - Scoreboard showing the player's score and the computer's score.
+  - An interactive game history section to view past sessions.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Project Structure:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **`move-master`:** The root directory of the project.
+- **`front-end`:** The Next.js frontend application directory.
+  - **`pages`:** Contains the main component (`MoveMaster.tsx`).
+  - **`components`:** Holds reusable UI components (like `ScoreBoard`, `BackgroundAnimation`, etc.).
+  - **`utils`:** Contains the `blockchainUtils.js` module for interacting with the smart contract.
+- **`sources`:** The Move smart contract directory.
+  - **`RockPaperScissors.move`:** The Move smart contract file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### How to Run:
 
-## Learn More
+1.  **Clone the Repository:** Clone the project repository.
+2.  **Install Dependencies:**
+    - Navigate to the `front-end` directory: `cd front-end`.
+    - Run `pnpm install` to install project dependencies.
+3.  **Configure Wallet Adapter:**
+    - Ensure you have the Petra wallet extension installed in your browser.
+    - Set up the wallet adapter in `_app.tsx` as described in the previous responses (ensure `@aptos-labs/wallet-adapter-petra` is installed).
+4.  **Deploy the Smart Contract:**
+    - Navigate to the `sources` directory: `cd sources`.
+    - Compile and deploy the smart contract using the Aptos CLI (e.g., `aptos move publish`).
+    - Replace the `contractAddress` constant in the frontend code with the actual address of your deployed smart contract.
+5.  **Run the Frontend:**
+    - Navigate back to the `front-end` directory: `cd ..`.
+    - Start the development server: `pnpm dev`.
 
-To learn more about Next.js, take a look at the following resources:
+### Smart Contract Details:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The Move smart contract `RockPaperScissors.move` handles the game logic, including:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Game Initialization:** The `create_new_game` entry function starts a new game.
+- **Player Move:** The `set_player_move` entry function sets the player's chosen move.
+- **Computer Move:** The `set_computer_move` entry function (using a randomness module) sets the computer's move.
+- **Result Calculation:** The `determine_winner` function compares moves and calculates the winner.
+- **Scorekeeping:** The `finalize_game_results` entry function updates the score and game history.
+- **Game Session Creation:** The `create_new_game_session` entry function creates a new game session, which is used for storing moves.
 
-## Deploy on Vercel
+### Additional Information:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- The project is currently set up to use the Aptos Devnet. You can adapt it to work with the Aptos mainnet by changing the network configuration and deploying the smart contract to the mainnet.
+- You can enhance the project with additional features, such as:
+  - A user profile to store player statistics.
+  - A betting system using Aptos coins (APT).
+  - A leaderboard to track top players.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This README provides a general overview of the Move Master project. Feel free to explore the code and experiment with the features to learn more about building games on the Aptos blockchain.

@@ -1,6 +1,5 @@
 "use client";
 
-import { useToast } from "@/components/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -33,10 +32,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useWallet, WalletName } from "@aptos-labs/wallet-adapter-react";
+import BackgroundAnimation from "@/components/BackgroundAnimation";
+import ScoreBoard from "@/components/ScoreBoard";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { AptosClient, BCS, HexString, TxnBuilderTypes } from "aptos";
-import { blockchainUtils } from "./utils/blockchainUtils";
-import { toast } from "@/hooks/use-toast";
+import { useNetwork } from "@aptos-labs/wallet-adapter-react";
+import { useAccount } from "@aptos-labs/wallet-adapter-react";
+import { blockchainUtils } from "@/utils/blockchainUtils"; // Import your blockchain utils module
 
 // Constants
 const moveEmojis: { [key: string]: string } = {
@@ -46,6 +48,13 @@ const moveEmojis: { [key: string]: string } = {
 };
 
 export default function MoveMaster() {
+  const {
+    connected,
+    account, // This object contains network and address
+    disconnect,
+    connect, // Use the connect function
+  } = useWallet();
+
   const [aptosClient, setAptosClient] = useState<AptosClient | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -56,6 +65,7 @@ export default function MoveMaster() {
   const [computerMove, setComputerMove] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [gameLoading, setGameLoading] = useState(false);
   const [playerScore, setPlayerScore] = useState(0);
   const [computerScore, setComputerScore] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -67,27 +77,15 @@ export default function MoveMaster() {
   const [showGameBoard, setShowGameBoard] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
-  const {
-    connected,
-    account,
-    disconnect,
-    connect,
-    wallet,
-    network,
-    signAndSubmitTransaction,
-  } = useWallet();
   useEffect(() => {
     // Connect to the Aptos network when wallet is connected
-    if (connected && network && account?.address) {
-      const { address } = account;
-      console.log("Connected to wallet:", account);
-
-      const client = new AptosClient(network.url);
+    if (connected && account?.network && account.address) {
+      const { network, address } = account;
+      const client = new AptosClient(network.rpcUrl);
       setAptosClient(client);
       setWalletConnected(true);
       setWalletAddress(address);
-      fetchScore(); // Fetch the score
-      setIsLoading(false);
+      fetchScore();
     } else {
       setWalletConnected(false);
       setWalletAddress(null);
@@ -96,11 +94,14 @@ export default function MoveMaster() {
 
   // Function to fetch the score from the contract
   const fetchScore = async () => {
-    if (!walletAddress) {
+    if (!aptosClient || !walletAddress) {
       return;
     }
     try {
-      const score = await blockchainUtils.fetchScore(walletAddress);
+      const score = await blockchainUtils.fetchScore(
+        aptosClient,
+        walletAddress
+      );
       if (score !== null) {
         setPlayerScore(score);
       }
@@ -112,33 +113,27 @@ export default function MoveMaster() {
 
   // Function to handle wallet connection
   const handleConnectWallet = async () => {
-    setIsLoading(true);
     try {
-      await connect("Petra" as WalletName<"Petra">);
+      await connect(); // Use connect() from useWallet to connect to Petra
       fetchScore();
       fetchGameHistory();
     } catch (error) {
       console.error("Error connecting wallet:", error);
     }
-    setIsLoading(false);
   };
 
-  // Function to start a new game
+  // Function to start the game
   const handleStartGame = async () => {
     setIsLoading(true);
-    if (!walletAddress) {
+    if (!aptosClient || !walletAddress) {
       return;
     }
     try {
-      await signAndSubmitTransaction({
-        sender: account?.address,
-        data: {
-          function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::RockPaperScissors::create_new_game`,
-          typeArguments: [],
-          functionArguments: [],
-        },
-      });
-      const newSession = await createNewGameSession();
+      await blockchainUtils.createNewGame(aptosClient, walletAddress); // Start a new game using blockchainUtils
+      const newSession = await blockchainUtils.createNewGameSession(
+        aptosClient,
+        walletAddress
+      ); // Create a new game session using blockchainUtils
       setCurrentSession(newSession);
       setGameSessions((prevSessions) => [newSession, ...prevSessions]);
       setGameStarted(true);
@@ -149,52 +144,26 @@ export default function MoveMaster() {
     } catch (error) {
       console.error("Error starting game:", error);
     }
-    setIsLoading(false);
+    setGameLoading(false);
   };
 
-  // Function to handle player move
   const handleMove = async (move: string) => {
     setIsLoading(true);
     setPlayerMove(move);
-    if (!walletAddress) {
+    if (!aptosClient || !walletAddress) {
       return;
     }
     try {
-      await signAndSubmitTransaction({
-        sender: account?.address,
-        data: {
-          function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::RockPaperScissors::set_player_move`,
-          typeArguments: [],
-          functionArguments: [
-            {
-              type: "u8",
-              value: moveToU8(move),
-            },
-          ],
-        },
-      });
-      await signAndSubmitTransaction({
-        sender: account?.address,
-        data: {
-          function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::RockPaperScissors::set_computer_move`,
-          typeArguments: [],
-          functionArguments: [],
-        },
-      });
-
-      const computerMove = await blockchainUtils.fetchComputerMove(
+      await blockchainUtils.setPlayerMove(aptosClient, walletAddress, move);
+      await blockchainUtils.setComputerMove(aptosClient, walletAddress);
+      const computerMove = await blockchainUtils.getComputerMove(
+        aptosClient,
         walletAddress
       );
       setComputerMove(computerMove);
-      await signAndSubmitTransaction({
-        sender: account?.address,
-        data: {
-          function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::RockPaperScissors::finalize_game_results`,
-          typeArguments: [],
-          functionArguments: [],
-        },
-      });
-      const resultResponse = await blockchainUtils.fetchGameResult(
+      await blockchainUtils.finalizeGameResults(aptosClient, walletAddress);
+      const resultResponse = await blockchainUtils.getGameResults(
+        aptosClient,
         walletAddress
       );
       const gameResult = getResult(move, resultResponse);
@@ -206,31 +175,6 @@ export default function MoveMaster() {
       console.error("Error submitting move:", error);
     }
     setIsLoading(false);
-  };
-
-  // Function to create a new game session
-  const createNewGameSession = async () => {
-    if (!walletAddress) {
-      return;
-    }
-    try {
-      await signAndSubmitTransaction({
-        sender: account?.address,
-        data: {
-          function: `${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}::RockPaperScissors::create_new_game_session`,
-          typeArguments: [],
-          functionArguments: [],
-        },
-      });
-      // Fetch the latest game session after successful creation
-      const latestSession = await blockchainUtils.fetchGameHistory(
-        walletAddress
-      );
-      // ... process latestSession to extract the session data
-      return latestSession;
-    } catch (error) {
-      console.error("Error creating new game session:", error);
-    }
   };
 
   const getResult = (playerMove: string, computerMove: string) => {
@@ -282,28 +226,6 @@ export default function MoveMaster() {
       navigator.clipboard.writeText(walletAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const fetchGameHistory = async () => {
-    if (!walletAddress) {
-      return;
-    }
-    try {
-      const history = await blockchainUtils.fetchGameHistory(walletAddress);
-      setGameSessions(
-        history.map((session) => ({
-          id: session.timestamp,
-          moves: session.moves.map((move) => ({
-            playerMove: u8ToMove(move.player_move),
-            computerMove: u8ToMove(move.computer_move),
-            result: u8ToMove(move.result),
-          })),
-          timestamp: session.timestamp * 1000, // Convert from seconds to milliseconds
-        }))
-      );
-    } catch (error) {
-      console.error("Error fetching game history:", error);
     }
   };
 
@@ -395,23 +317,21 @@ export default function MoveMaster() {
                   <CardTitle className="text-3xl font-bold">
                     MoveMaster 🎮
                   </CardTitle>
-                  {walletConnected && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleStartGame}
-                      aria-label="New game"
-                    >
-                      <PlusCircle className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleStartGame}
+                    aria-label="New game"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                  </Button>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center space-y-4">
                   <ScoreBoard
                     playerScore={playerScore}
                     computerScore={computerScore}
                   />
-                  {!account?.address && (
+                  {!walletConnected && (
                     <Button
                       onClick={handleConnectWallet}
                       className="w-full"
@@ -421,7 +341,7 @@ export default function MoveMaster() {
                       {isLoading ? "Connecting..." : "Connect Wallet"}
                     </Button>
                   )}
-                  {account?.address && !gameStarted && (
+                  {walletConnected && !gameStarted && (
                     <Button
                       onClick={handleStartGame}
                       className="w-full"
@@ -635,16 +555,4 @@ function BackgroundAnimation() {
       ))}
     </div>
   );
-}
-
-interface GameMove {
-  playerMove: string;
-  computerMove: string;
-  result: string;
-}
-
-interface GameSession {
-  id: number;
-  moves: GameMove[];
-  timestamp: number;
 }
