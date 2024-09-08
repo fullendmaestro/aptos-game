@@ -6,7 +6,7 @@ const contractAddress =
 
 // Configure the Aptos client
 const config = new AptosConfig({
-  network: Network.DEVNET, // Use TESTNET for Devnet or Mainnet for the main network
+  network: Network.TESTNET, // Use TESTNET for Devnet or Mainnet for the main network
 });
 
 const aptos = new Aptos(config);
